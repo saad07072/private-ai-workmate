@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+**/data/qdrant/
+**/data/*.db
+**/data/tool_audit.jsonl
