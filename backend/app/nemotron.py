@@ -4,11 +4,13 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 
-# Load environment variables from .env
 load_dotenv()
 
 
-# Get Nebius API key
+# -------------------------------------------------
+# Environment
+# -------------------------------------------------
+
 api_key = os.getenv("NEBIUS_API_KEY")
 
 if not api_key:
@@ -17,18 +19,38 @@ if not api_key:
     )
 
 
-# Nebius Token Factory OpenAI-compatible client
+# -------------------------------------------------
+# Nebius Token Factory
+# -------------------------------------------------
+
 client = OpenAI(
     base_url="https://api.tokenfactory.nebius.com/v1/",
     api_key=api_key,
 )
 
 
-# NVIDIA Nemotron model
-MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+# -------------------------------------------------
+# Models
+# -------------------------------------------------
+
+FAST_MODEL = os.getenv(
+    "NEBIUS_FAST_MODEL",
+    "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+)
+
+REASONING_MODEL = os.getenv(
+    "NEBIUS_REASONING_MODEL",
+    "nvidia/Nemotron-3-Ultra-550b-a55b",
+)
+
+# Backwards-compatible default model name.
+MODEL = FAST_MODEL
 
 
-# Main system instructions
+# -------------------------------------------------
+# System prompt
+# -------------------------------------------------
+
 SYSTEM_PROMPT = (
     "You are Private AI Workmate, a personal AI assistant. "
     "Be helpful, concise, accurate, and transparent. "
@@ -43,20 +65,40 @@ SYSTEM_PROMPT = (
 )
 
 
-def ask_nemotron(messages: list[dict]) -> str:
+# -------------------------------------------------
+# Model generation
+# -------------------------------------------------
+
+def ask_nemotron(
+    messages: list[dict],
+    model: str | None = None,
+    max_tokens: int | None = None,
+) -> str:
     """
-    Send conversation messages to NVIDIA Nemotron
-    through Nebius Token Factory.
+    Send messages to NVIDIA Nemotron through Nebius.
 
     Parameters:
-        messages: List of chat messages containing
-                  role and content.
+        messages:
+            Conversation messages.
+
+        model:
+            Optional model override.
+
+        max_tokens:
+            Optional output token limit.
 
     Returns:
-        The assistant's response as a string.
+        Assistant response as a string.
     """
 
-    # Start with our system instructions
+    selected_model = model or FAST_MODEL
+
+    if max_tokens is None:
+        if selected_model == REASONING_MODEL:
+            max_tokens = 1200
+        else:
+            max_tokens = 700
+
     formatted_messages = [
         {
             "role": "system",
@@ -64,20 +106,16 @@ def ask_nemotron(messages: list[dict]) -> str:
         }
     ]
 
-    # Add conversation history and memory context
     formatted_messages.extend(messages)
 
-    # Send request to Nemotron
     response = client.chat.completions.create(
-        model=MODEL,
+        model=selected_model,
         messages=formatted_messages,
-        max_tokens=500,
+        max_tokens=max_tokens,
     )
 
-    # Extract assistant response
     content = response.choices[0].message.content
 
-    # Prevent an empty response from reaching the API
     if content:
         return content.strip()
 
