@@ -24,7 +24,9 @@ The application does not provide authentication, encryption, HTTPS configuration
 
 The current frontend presents the chat workspace with its responsive shell, model status, agent context panel, and private-workspace suggestions.
 
-![Private AI Workmate workspace](docs/workmate-ui.png)
+<p align="center">
+  <img src="docs/workmate-ui-readme.png" alt="Private AI Workmate workspace" width="100%" />
+</p>
 
 ## Current Architecture
 
