@@ -6,3 +6,6 @@ __pycache__/
 **/data/qdrant/
 **/data/*.db
 **/data/tool_audit.jsonl
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
