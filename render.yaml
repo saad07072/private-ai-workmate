@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: private-ai-workmate-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    dockerCommand: sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'
+    healthCheckPath: /health
+    disk:
+      name: workmate-data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: WORKMATE_COOKIE_SECURE
+        value: "true"
+      - key: WORKMATE_COOKIE_SAMESITE
+        value: none
+      - key: WORKMATE_DATA_DIR
+        value: /app/data
+      - key: WORKMATE_DATABASE_PATH
+        value: /app/data/workmate.db
+      - key: WORKMATE_QDRANT_PATH
+        value: /app/data/qdrant
+      - key: WORKMATE_DOCUMENTS_PATH
+        value: /app/data/documents
+      - key: WORKMATE_AUDIT_FILE
+        value: /app/data/tool_audit.jsonl
+      - key: WORKMATE_TOOL_MODE
+        value: read_only

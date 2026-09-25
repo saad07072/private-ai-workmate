@@ -118,6 +118,18 @@ The backend uses `/app/data/workmate.db`, `/app/data/documents`, `/app/data/tool
 
 For production operations, configure VM-level monitoring, log rotation, OS updates, TLS renewal, firewall rules, and secret rotation separately from this application stack.
 
+## Vercel + Render
+
+The repository includes `frontend/vercel.json` and `render.yaml` for a split deployment:
+
+1. Create a Render Blueprint from the repository and apply `render.yaml`. Use a paid Render plan because the backend disk stores SQLite, uploaded documents, audit logs, and embedded Qdrant data. The disk must remain attached to exactly one backend instance.
+2. In Render, set `NEBIUS_API_KEY`, optionally set `GITHUB_TOKEN`, and set `CORS_ORIGINS` to the final Vercel origin, for example `https://your-workmate.vercel.app`. Do not include a trailing slash or a path.
+3. Deploy the `frontend` directory as a Vercel project. Set its Root Directory to `frontend`, Framework Preset to `Vite`, and add `VITE_API_BASE_URL` with the Render service URL, for example `https://private-ai-workmate-api.onrender.com`.
+4. Redeploy both services after setting the final domains. Render uses `WORKMATE_COOKIE_SECURE=true` and `WORKMATE_COOKIE_SAMESITE=none` so the HttpOnly session cookie can be sent from the Vercel origin over HTTPS.
+5. Verify the Render URL at `/health`, then register an account from the Vercel site and test chat, memory, document upload, and logout/login.
+
+Render's free web services do not provide a persistent disk. Without persistent storage, the SQLite database, uploaded documents, audit log, and embedded Qdrant collections can disappear after a restart or redeploy. For multi-instance or higher-availability deployments, replace SQLite and embedded Qdrant with managed services before scaling the backend.
+
 ## Troubleshooting
 
 ### Frontend loads but API calls fail

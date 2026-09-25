@@ -17,6 +17,7 @@ from app.memory.database import get_connection, initialize_database
 SESSION_COOKIE = "workmate_session"
 SESSION_DAYS = 7
 COOKIE_SECURE = os.getenv("WORKMATE_COOKIE_SECURE", "false").lower() == "true"
+COOKIE_SAMESITE = os.getenv("WORKMATE_COOKIE_SAMESITE", "lax").lower()
 _active_user_id: ContextVar[str] = ContextVar("active_user_id", default="")
 
 
@@ -152,7 +153,7 @@ def set_session_cookie(response: Response, token: str) -> None:
         max_age=SESSION_DAYS * 24 * 60 * 60,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
 
