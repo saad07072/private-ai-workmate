@@ -3,7 +3,7 @@ import hmac
 import os
 import secrets
 import sqlite3
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import uuid4
@@ -88,6 +88,14 @@ def current_user_id(user: dict) -> str:
 
 def get_authenticated_user_id() -> str:
     return _active_user_id.get()
+
+
+def set_authenticated_user_id(user_id: str) -> Token[str]:
+    return _active_user_id.set(user_id)
+
+
+def reset_authenticated_user_id(token: Token[str]) -> None:
+    _active_user_id.reset(token)
 
 
 def register_user(request: AuthRequest) -> tuple[dict, str]:

@@ -1,10 +1,9 @@
 from qdrant_client import QdrantClient
 
-
-QDRANT_PATH = "data/qdrant"
+from app.config import QDRANT_PATH
 
 
 # One shared Qdrant client for the entire application.
 qdrant_client = QdrantClient(
-    path=QDRANT_PATH
+    path=str(QDRANT_PATH)
 )

@@ -15,6 +15,7 @@ from app.rag.service import (
     remove_document,
 )
 from app.auth import get_current_user
+from app.config import DOCUMENTS_PATH
 
 
 router = APIRouter(
@@ -23,9 +24,7 @@ router = APIRouter(
 )
 
 
-BASE_DIR = Path(__file__).resolve().parents[3]
-
-DOCUMENT_DIR = BASE_DIR / "data" / "documents"
+DOCUMENT_DIR = DOCUMENTS_PATH
 
 DOCUMENT_DIR.mkdir(
     parents=True,

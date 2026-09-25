@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import (
     auth_router,
@@ -21,6 +22,7 @@ from app.api.documents import (
 from app.memory.database import (
     initialize_database,
 )
+from app.config import CORS_ORIGINS
 
 
 @asynccontextmanager
@@ -38,6 +40,14 @@ app = FastAPI(
     ),
     version="0.3.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 

@@ -3,18 +3,14 @@ from pathlib import Path
 import json
 import re
 
+from app.config import AUDIT_FILE
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-
-AUDIT_DIR = BASE_DIR / "data"
+AUDIT_DIR = AUDIT_FILE.parent
 
 AUDIT_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
-
-AUDIT_FILE = AUDIT_DIR / "tool_audit.jsonl"
-
 
 SECRET_KEY_PATTERN = re.compile(
     r"(api[_-]?key|access[_-]?token|"

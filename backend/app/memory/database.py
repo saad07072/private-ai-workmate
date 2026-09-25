@@ -1,16 +1,10 @@
 import sqlite3
-from pathlib import Path
 
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
-
-DATABASE_PATH = DATA_DIR / "workmate.db"
+from app.config import DATABASE_PATH
 
 
 def get_connection():
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH)
 
     connection.row_factory = sqlite3.Row
