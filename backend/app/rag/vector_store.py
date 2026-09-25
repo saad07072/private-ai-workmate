@@ -80,6 +80,7 @@ def store_document_chunks(
     document_id: int,
     filename: str,
     chunks: list[dict],
+    user_id: str = "",
 ):
     points = []
 
@@ -94,6 +95,7 @@ def store_document_chunks(
                 vector=vector,
                 payload={
                     "document_id": document_id,
+                    "user_id": user_id,
                     "filename": filename,
                     "text": chunk["text"],
                     "page": chunk.get("page"),
@@ -114,19 +116,25 @@ def store_document_chunks(
 def search_documents(
     query: str,
     limit: int = 5,
+    user_id: str = "",
 ):
     query_vector = create_embedding(query)
 
     results = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vector,
-        limit=limit,
+        limit=max(limit * 4, limit),
     )
 
     matches = []
 
+    from app.rag.database import get_document
+
     for result in results.points:
         payload = result.payload or {}
+
+        if not payload.get("document_id") or get_document(payload["document_id"], user_id) is None:
+            continue
 
         matches.append(
             {
@@ -155,6 +163,7 @@ def search_documents(
 
 def delete_document_vectors(
     document_id: int,
+    user_id: str = "",
 ):
     qdrant_client.delete(
         collection_name=COLLECTION_NAME,
@@ -165,6 +174,11 @@ def delete_document_vectors(
                     match=MatchValue(
                         value=document_id
                     ),
+                )
+                ,
+                FieldCondition(
+                    key="user_id",
+                    match=MatchValue(value=user_id),
                 )
             ]
         ),

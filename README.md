@@ -18,7 +18,7 @@ The current system can:
 - Record tool and security events in a JSONL audit file.
 - Provide a responsive frontend for chat, memory, documents, GitHub analysis, and security status.
 
-The application does not provide authentication, encryption, HTTPS configuration, arbitrary shell execution, arbitrary Python execution, web browsing, or production deployment.
+The application provides email/password authentication with HttpOnly session cookies and per-user ownership for conversations, memories, and documents. HTTPS configuration, encryption at rest, arbitrary shell execution, arbitrary Python execution, web browsing, and production deployment remain outside the local application.
 
 ## Interface Preview
 
@@ -143,7 +143,7 @@ The permission layer is implemented in `backend/app/tools/permissions.py`.
 - Repository paths reject absolute paths, null bytes, and `..` traversal segments.
 - Tool-specific limits validate IDs, queries, refs, and result counts.
 
-There is no user approval workflow or authentication layer in the current application.
+Authentication is provided through `/api/auth/register`, `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout`. Sessions are stored in SQLite and the browser receives only an HttpOnly session cookie. Conversations, memories, and documents are scoped to the authenticated user.
 
 ## Prompt-injection Protection
 
@@ -194,6 +194,15 @@ POST /api/chat
 GET /api/conversations/{conversation_id}
 ```
 
+### Authentication
+
+```http
+POST /api/auth/register
+POST /api/auth/login
+GET /api/auth/me
+POST /api/auth/logout
+```
+
 Chat request:
 
 ```json
@@ -241,6 +250,7 @@ GITHUB_TOKEN=optional_github_token
 NEBIUS_FAST_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
 NEBIUS_REASONING_MODEL=nvidia/Nemotron-3-Ultra-550b-a55b
 WORKMATE_TOOL_MODE=read_only
+WORKMATE_COOKIE_SECURE=false
 ```
 
 Start FastAPI:
@@ -286,7 +296,6 @@ Open `http://127.0.0.1:5173/`. The frontend does not contain backend credentials
 ### Planned or not currently exposed
 
 - Wiring `model_router.select_model()` into the public agent path for active per-request routing.
-- Authentication and user accounts.
 - User approval workflows.
 - A frontend audit-history or live tool-event endpoint.
 - Production deployment, monitoring, and operational hardening.

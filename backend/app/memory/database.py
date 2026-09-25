@@ -23,11 +23,37 @@ def initialize_database():
 
     cursor = connection.cursor()
 
+    # Accounts and sessions are created before user-owned data tables.
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+        """
+    )
+
     # Conversations
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,
+            user_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -53,6 +79,7 @@ def initialize_database():
         """
         CREATE TABLE IF NOT EXISTS memories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
             content TEXT NOT NULL,
             category TEXT DEFAULT 'general',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,6 +92,7 @@ def initialize_database():
         """
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
             filename TEXT NOT NULL,
             file_type TEXT NOT NULL,
             file_path TEXT NOT NULL,
@@ -73,6 +101,18 @@ def initialize_database():
         )
         """
     )
+
+    # Add ownership columns to databases created before authentication.
+    for table in ("conversations", "memories", "documents"):
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)")
 
     connection.commit()
 

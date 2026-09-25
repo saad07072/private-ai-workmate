@@ -14,6 +14,7 @@ from app.rag.extractor import (
 from app.rag.retrieval import (
     retrieve_relevant_documents,
 )
+from app.auth import get_authenticated_user_id
 
 
 # ---------------------------------------------------------
@@ -139,7 +140,8 @@ def current_time():
 # ---------------------------------------------------------
 
 def list_documents():
-    documents = get_documents()
+    user_id = get_authenticated_user_id()
+    documents = get_documents(user_id)
 
     return {
         "documents": documents,
@@ -167,6 +169,7 @@ def search_documents(
     results = retrieve_relevant_documents(
         query=query,
         limit=limit,
+        user_id=get_authenticated_user_id(),
     )
 
     return {
@@ -182,9 +185,7 @@ def search_documents(
 def read_document(
     document_id: int,
 ):
-    document = get_document(
-        document_id
-    )
+    document = get_document(document_id, get_authenticated_user_id())
 
     if document is None:
         raise ValueError(

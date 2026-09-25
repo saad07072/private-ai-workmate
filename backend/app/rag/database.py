@@ -5,6 +5,7 @@ def add_document(
     filename: str,
     file_type: str,
     file_path: str,
+    user_id: str,
 ) -> int:
     connection = get_connection()
 
@@ -13,13 +14,15 @@ def add_document(
     cursor.execute(
         """
         INSERT INTO documents (
+            user_id,
             filename,
             file_type,
             file_path
         )
-        VALUES (?, ?, ?)
+        VALUES (?, ?, ?, ?)
         """,
         (
+            user_id,
             filename,
             file_type,
             file_path,
@@ -60,7 +63,7 @@ def update_document_chunk_count(
     connection.close()
 
 
-def get_documents():
+def get_documents(user_id: str):
     connection = get_connection()
 
     cursor = connection.cursor()
@@ -74,8 +77,10 @@ def get_documents():
             chunk_count,
             created_at
         FROM documents
+        WHERE user_id = ?
         ORDER BY created_at DESC
-        """
+        """,
+        (user_id,),
     )
 
     documents = [
@@ -88,7 +93,7 @@ def get_documents():
     return documents
 
 
-def get_document(document_id: int):
+def get_document(document_id: int, user_id: str):
     connection = get_connection()
 
     cursor = connection.cursor()
@@ -97,9 +102,9 @@ def get_document(document_id: int):
         """
         SELECT *
         FROM documents
-        WHERE id = ?
+        WHERE id = ? AND user_id = ?
         """,
-        (document_id,),
+        (document_id, user_id),
     )
 
     row = cursor.fetchone()
@@ -112,7 +117,7 @@ def get_document(document_id: int):
     return dict(row)
 
 
-def delete_document_record(document_id: int) -> bool:
+def delete_document_record(document_id: int, user_id: str) -> bool:
     connection = get_connection()
 
     cursor = connection.cursor()
@@ -120,9 +125,9 @@ def delete_document_record(document_id: int) -> bool:
     cursor.execute(
         """
         DELETE FROM documents
-        WHERE id = ?
+        WHERE id = ? AND user_id = ?
         """,
-        (document_id,),
+        (document_id, user_id),
     )
 
     deleted = cursor.rowcount > 0

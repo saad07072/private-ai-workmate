@@ -77,6 +77,7 @@ def store_semantic_memory(
     memory_id: int,
     content: str,
     category: str,
+    user_id: str = "",
 ):
     vector = create_embedding(content)
 
@@ -88,6 +89,7 @@ def store_semantic_memory(
                 vector=vector,
                 payload={
                     "memory_id": memory_id,
+                    "user_id": user_id,
                     "content": content,
                     "category": category,
                 },
@@ -99,14 +101,17 @@ def store_semantic_memory(
 def search_semantic_memories(
     query: str,
     limit: int = 5,
+    user_id: str = "",
 ):
     query_vector = create_embedding(query)
 
     results = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vector,
-        limit=limit,
+        limit=max(limit * 4, limit),
     )
+
+    from app.memory.long_term import memory_belongs_to_user
 
     return [
         {
@@ -116,4 +121,6 @@ def search_semantic_memories(
             "score": result.score,
         }
         for result in results.points
-    ]
+        if result.payload
+        and memory_belongs_to_user(result.payload["memory_id"], user_id)
+    ][:limit]

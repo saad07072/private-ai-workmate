@@ -18,6 +18,7 @@ def ingest_document(
     file_path: str,
     filename: str,
     file_type: str,
+    user_id: str,
 ) -> dict:
     """
     Extract, chunk, embed and index a document.
@@ -59,6 +60,7 @@ def ingest_document(
         filename=filename,
         file_type=file_type,
         file_path=file_path,
+        user_id=user_id,
     )
 
     try:
@@ -66,6 +68,7 @@ def ingest_document(
             document_id=document_id,
             filename=filename,
             chunks=chunks,
+            user_id=user_id,
         )
 
         update_document_chunk_count(
@@ -75,7 +78,8 @@ def ingest_document(
 
     except Exception:
         delete_document_record(
-            document_id
+            document_id,
+            user_id,
         )
 
         raise
@@ -88,14 +92,15 @@ def ingest_document(
     }
 
 
-def remove_document(document_id: int) -> bool:
-    document = get_document(document_id)
+def remove_document(document_id: int, user_id: str) -> bool:
+    document = get_document(document_id, user_id)
 
     if document is None:
         return False
 
     delete_document_vectors(
-        document_id
+        document_id,
+        user_id,
     )
 
     file_path = Path(
@@ -106,7 +111,8 @@ def remove_document(document_id: int) -> bool:
         file_path.unlink()
 
     delete_document_record(
-        document_id
+        document_id,
+        user_id,
     )
 
     return True

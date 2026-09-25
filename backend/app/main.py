@@ -2,6 +2,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.auth import (
+    auth_router,
+)
+
 from app.api.chat import (
     router as chat_router,
 )
@@ -47,6 +51,10 @@ app.include_router(
 
 app.include_router(
     documents_router
+)
+
+app.include_router(
+    auth_router()
 )
 
 

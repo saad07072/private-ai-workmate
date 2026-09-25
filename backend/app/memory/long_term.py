@@ -1,7 +1,7 @@
 from app.memory.database import get_connection
 
 
-def add_memory(content: str, category: str = "general") -> int:
+def add_memory(content: str, category: str = "general", user_id: str = "") -> int:
     """
     Add a long-term memory to SQLite.
 
@@ -15,10 +15,10 @@ def add_memory(content: str, category: str = "general") -> int:
 
     cursor.execute(
         """
-        INSERT INTO memories (content, category)
-        VALUES (?, ?)
+        INSERT INTO memories (content, category, user_id)
+        VALUES (?, ?, ?)
         """,
-        (content, category),
+        (content, category, user_id),
     )
 
     memory_id = cursor.lastrowid
@@ -29,7 +29,7 @@ def add_memory(content: str, category: str = "general") -> int:
     return memory_id
 
 
-def get_memories():
+def get_memories(user_id: str):
     """
     Return all long-term memories.
     """
@@ -42,8 +42,10 @@ def get_memories():
         """
         SELECT id, content, category, created_at
         FROM memories
+        WHERE user_id = ?
         ORDER BY created_at DESC
-        """
+        """,
+        (user_id,),
     )
 
     memories = [dict(row) for row in cursor.fetchall()]
@@ -53,7 +55,7 @@ def get_memories():
     return memories
 
 
-def delete_memory(memory_id: int) -> bool:
+def delete_memory(memory_id: int, user_id: str) -> bool:
     """
     Delete a long-term memory by ID.
 
@@ -68,9 +70,9 @@ def delete_memory(memory_id: int) -> bool:
     cursor.execute(
         """
         DELETE FROM memories
-        WHERE id = ?
+        WHERE id = ? AND user_id = ?
         """,
-        (memory_id,),
+        (memory_id, user_id),
     )
 
     deleted = cursor.rowcount > 0
@@ -79,3 +81,13 @@ def delete_memory(memory_id: int) -> bool:
     connection.close()
 
     return deleted
+
+
+def memory_belongs_to_user(memory_id: int, user_id: str) -> bool:
+    connection = get_connection()
+    row = connection.execute(
+        "SELECT 1 FROM memories WHERE id = ? AND user_id = ?",
+        (memory_id, user_id),
+    ).fetchone()
+    connection.close()
+    return row is not None

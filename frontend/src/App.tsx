@@ -7,13 +7,15 @@ import {
 
 type Page = 'chat' | 'memory' | 'documents' | 'github' | 'security'
 type Message = { role: 'user' | 'assistant'; content: string }
+type User = { id: string; email: string }
+type Conversation = { id: string; title?: string; created_at?: string; message_count: number }
 type Memory = { id: number; content: string; category: string; created_at?: string }
 type Document = { id: number; filename: string; file_type: string; chunk_count?: number; created_at?: string }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, options)
+  const response = await fetch(`${API_BASE}${path}`, { ...options, credentials: 'include' })
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     throw new Error(body?.detail || 'The Workmate service returned an error.')
@@ -22,6 +24,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 function App() {
+  const [authUser, setAuthUser] = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [page, setPage] = useState<Page>('chat')
   const [mobileNav, setMobileNav] = useState(false)
   const [conversationId, setConversationId] = useState<string>()
@@ -31,15 +35,31 @@ function App() {
   const [chatError, setChatError] = useState('')
   const [memories, setMemories] = useState<Memory[]>([])
   const [documents, setDocuments] = useState<Document[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
 
   useEffect(() => {
     request<{ status: string }>('/health').then(() => setBackendOnline(true)).catch(() => setBackendOnline(false))
   }, [])
 
   useEffect(() => {
+    request<{ user: User }>('/api/auth/me')
+      .then((data) => setAuthUser(data.user))
+      .catch(() => setAuthUser(null))
+      .finally(() => setAuthLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!authUser) return
+    request<{ conversations: Conversation[] }>('/api/conversations')
+      .then((data) => setConversations(data.conversations))
+      .catch(() => undefined)
+  }, [authUser])
+
+  useEffect(() => {
+    if (!authUser) return
     if (page === 'memory') request<{ memories: Memory[] }>('/api/memory').then((data) => setMemories(data.memories)).catch(() => undefined)
     if (page === 'documents') request<{ documents: Document[] }>('/api/documents').then((data) => setDocuments(data.documents)).catch(() => undefined)
-  }, [page])
+  }, [page, authUser])
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -65,6 +85,18 @@ function App() {
     navigate('chat')
   }
 
+  async function openConversation(id: string) {
+    try {
+      const data = await request<{ messages: Message[] }>(`/api/conversations/${encodeURIComponent(id)}`)
+      setConversationId(id)
+      setMessages(data.messages)
+      setChatError('')
+      navigate('chat')
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : 'This conversation could not be loaded.')
+    }
+  }
+
   async function sendMessage(message: string) {
     const clean = message.trim()
     if (!clean || chatBusy) return
@@ -78,6 +110,9 @@ function App() {
       })
       setConversationId(data.conversation_id)
       setMessages((current) => [...current, { role: 'assistant', content: data.response }])
+      request<{ conversations: Conversation[] }>('/api/conversations')
+        .then((latest) => setConversations(latest.conversations))
+        .catch(() => undefined)
     } catch (error) {
       setChatError(error instanceof Error ? error.message : 'Connection to Workmate was interrupted.')
     } finally {
@@ -85,14 +120,24 @@ function App() {
     }
   }
 
+  async function logout() {
+    await request('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
+    setAuthUser(null)
+    setConversationId(undefined)
+    setMessages([])
+  }
+
+  if (authLoading) return <div className="auth-loading">Loading your private workspace...</div>
+  if (!authUser) return <AuthView onAuthenticated={setAuthUser} />
+
   return <div className="app-shell">
     <div className="ambient ambient-one" /><div className="ambient ambient-two" />
-    <Sidebar page={page} backendOnline={backendOnline} onNavigate={navigate} onNewChat={newChat} />
+    <Sidebar page={page} backendOnline={backendOnline} conversations={conversations} activeConversationId={conversationId} onNavigate={navigate} onNewChat={newChat} onOpenConversation={openConversation} />
     <main className="main-column">
       <header className="topbar">
         <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
         <div className="topbar-heading"><span className="eyebrow">PRIVATE AI WORKMATE <b>/</b> {pageTitle(page).toUpperCase()}</span><h1>{pageTitle(page)}</h1></div>
-        <div className="topbar-actions"><div className="topbar-model"><Zap size={13} /><span>Nemotron</span><small>Nebius</small></div><StatusPill online={backendOnline} /><button className="avatar" aria-label="Account">S</button></div>
+        <div className="topbar-actions"><div className="topbar-model"><Zap size={13} /><span>Nemotron</span><small>Nebius</small></div><StatusPill online={backendOnline} /><button className="avatar" aria-label={`Log out ${authUser.email}`} title={authUser.email} onClick={logout}>{authUser.email.slice(0, 1).toUpperCase()}</button></div>
       </header>
       {mobileNav && <MobileNav page={page} onNavigate={navigate} onClose={() => setMobileNav(false)} />}
       <div className="content-area">
@@ -111,7 +156,7 @@ function pageTitle(page: Page) {
   return ({ chat: 'Workspace', memory: 'Memory', documents: 'Documents', github: 'GitHub Agent', security: 'Security Center' })[page]
 }
 
-function Sidebar({ page, backendOnline, onNavigate, onNewChat }: { page: Page; backendOnline: boolean; onNavigate: (page: Page) => void; onNewChat: () => void }) {
+function Sidebar({ page, backendOnline, conversations, activeConversationId, onNavigate, onNewChat, onOpenConversation }: { page: Page; backendOnline: boolean; conversations: Conversation[]; activeConversationId?: string; onNavigate: (page: Page) => void; onNewChat: () => void; onOpenConversation: (id: string) => void }) {
   const items: { id: Page; label: string; icon: ReactNode }[] = [
     { id: 'chat', label: 'Chat', icon: <MessageSquare size={17} /> },
     { id: 'memory', label: 'Memory', icon: <BrainCircuit size={17} /> },
@@ -125,13 +170,41 @@ function Sidebar({ page, backendOnline, onNavigate, onNewChat }: { page: Page; b
     <div className="nav-label">Workspace</div>
     <nav>{items.map((item) => <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} onClick={() => onNavigate(item.id)}>{item.icon}<span>{item.label}</span>{item.id === 'chat' && <i />}</button>)}</nav>
     <div className="recent-label">Recent conversations</div>
-    <button className="recent-item" onClick={() => onNavigate('chat')}><span className="recent-dot" />New workspace session</button>
+    <div className="conversation-list">{conversations.length === 0 ? <span className="conversation-empty">No conversations yet</span> : conversations.map((conversation) => <button key={conversation.id} className={`recent-item ${activeConversationId === conversation.id ? 'active' : ''}`} onClick={() => onOpenConversation(conversation.id)} title={conversation.title || 'Untitled conversation'}><span className="recent-dot" /><span>{conversation.title || 'Untitled conversation'}</span></button>)}</div>
     <div className="sidebar-footer"><div className="model-card"><div className="model-icon"><Zap size={16} /></div><div><b>Nemotron</b><small>Nebius Token Factory</small></div><span className={`online-dot ${backendOnline ? '' : 'offline'}`} /></div><button className="settings-button"><Activity size={16} />System status</button></div>
   </aside>
 }
 
 function MobileNav({ page, onNavigate, onClose }: { page: Page; onNavigate: (page: Page) => void; onClose: () => void }) {
   return <div className="mobile-nav"><div className="mobile-nav-head"><b>Navigate</b><button className="icon-button" onClick={onClose} aria-label="Close navigation"><X size={18} /></button></div>{(['chat', 'memory', 'documents', 'github', 'security'] as Page[]).map((item) => <button key={item} className={page === item ? 'active' : ''} onClick={() => onNavigate(item)}>{pageTitle(item)}</button>)}</div>
+}
+
+function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const data = await request<{ user: User }>(`/api/auth/${mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      onAuthenticated(data.user)
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'Authentication failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <main className="auth-screen"><section className="auth-card"><div className="brand"><span className="brand-mark"><Sparkles size={16} /></span><span>PRIVATE AI<br /><strong>WORKMATE</strong></span></div><span className="eyebrow accent">PRIVATE WORKSPACE</span><h1>{mode === 'login' ? 'Welcome back.' : 'Create your workspace.'}</h1><p>Your conversations, memories, and documents stay tied to your account.</p><form onSubmit={submit}><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={8} required /></label>{error && <div className="auth-error"><CircleAlert size={15} />{error}</div>}<button className="primary-button auth-submit" disabled={busy}>{busy ? 'Working...' : mode === 'login' ? 'Log in' : 'Create account'}</button></form><button className="auth-switch" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'Create a new account' : 'I already have an account'}</button></section></main>
 }
 
 function StatusPill({ online }: { online: boolean }) { return <span className={`status-pill ${online ? '' : 'offline'}`}><span />{online ? 'CONNECTED' : 'OFFLINE'}</span> }

@@ -1,10 +1,14 @@
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.memory.store import (
     conversation_store,
+)
+
+from app.auth import (
+    get_current_user,
 )
 
 from app.memory.retrieval import (
@@ -60,7 +64,9 @@ class ChatResponse(BaseModel):
 )
 def chat(
     request: ChatRequest,
+    user: dict = Depends(get_current_user),
 ):
+    user_id = user["id"]
     conversation_id = (
         request.conversation_id
         or str(uuid.uuid4())
@@ -86,17 +92,20 @@ def chat(
         )
 
     conversation_store.create_conversation(
-        conversation_id
+        conversation_id,
+        user_id,
     )
 
     conversation_store.add_message(
         conversation_id=conversation_id,
         role="user",
         content=request.message,
+        user_id=user_id,
     )
 
     history = conversation_store.get_messages(
-        conversation_id
+        conversation_id,
+        user_id,
     )
 
     messages_for_agent = []
@@ -105,9 +114,7 @@ def chat(
     # Long-term memory
     # -------------------------------------------------
 
-    memories = retrieve_relevant_memories(
-        request.message
-    )
+    memories = retrieve_relevant_memories(request.message, user_id=user_id)
 
     if memories:
         memory_lines = []
@@ -140,9 +147,7 @@ def chat(
     # RAG context
     # -------------------------------------------------
 
-    documents = retrieve_relevant_documents(
-        request.message
-    )
+    documents = retrieve_relevant_documents(request.message, user_id=user_id)
 
     if documents:
         document_lines = []
@@ -212,6 +217,7 @@ def chat(
         conversation_id=conversation_id,
         role="assistant",
         content=response,
+        user_id=user_id,
     )
 
     return {
@@ -221,13 +227,24 @@ def chat(
 
 
 @router.get(
+    "/conversations"
+)
+def list_conversations(user: dict = Depends(get_current_user)):
+    return {
+        "conversations": conversation_store.list_conversations(user["id"]),
+    }
+
+
+@router.get(
     "/conversations/{conversation_id}"
 )
 def get_conversation(
     conversation_id: str,
+    user: dict = Depends(get_current_user),
 ):
     messages = conversation_store.get_messages(
-        conversation_id
+        conversation_id,
+        user["id"],
     )
 
     return {

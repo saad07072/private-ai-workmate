@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from fastapi import (
     APIRouter,
+    Depends,
     File,
     HTTPException,
     UploadFile,
@@ -13,6 +14,7 @@ from app.rag.service import (
     ingest_document,
     remove_document,
 )
+from app.auth import get_current_user
 
 
 router = APIRouter(
@@ -44,6 +46,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
 ):
     if not file.filename:
         raise HTTPException(
@@ -89,6 +92,7 @@ async def upload_document(
             file_path=str(file_path),
             filename=original_name,
             file_type=extension.lstrip("."),
+            user_id=user["id"],
         )
 
         return {
@@ -107,19 +111,18 @@ async def upload_document(
 
 
 @router.get("")
-def list_documents():
+def list_documents(user: dict = Depends(get_current_user)):
     return {
-        "documents": get_documents(),
+        "documents": get_documents(user["id"]),
     }
 
 
 @router.delete("/{document_id}")
 def delete_document(
     document_id: int,
+    user: dict = Depends(get_current_user),
 ):
-    deleted = remove_document(
-        document_id
-    )
+    deleted = remove_document(document_id, user["id"])
 
     if not deleted:
         raise HTTPException(
