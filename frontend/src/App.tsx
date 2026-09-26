@@ -44,7 +44,7 @@ function App() {
   useEffect(() => {
     request<{ user: User }>('/api/auth/me')
       .then((data) => setAuthUser(data.user))
-      .catch(() => setAuthUser(null))
+      .catch(() => request<{ user: User }>('/api/auth/demo', { method: 'POST' }).then((data) => setAuthUser(data.user)).catch(() => setAuthUser(null)))
       .finally(() => setAuthLoading(false))
   }, [])
 
@@ -122,13 +122,14 @@ function App() {
 
   async function logout() {
     await request('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
-    setAuthUser(null)
     setConversationId(undefined)
     setMessages([])
+    request<{ user: User }>('/api/auth/demo', { method: 'POST' })
+      .then((data) => setAuthUser(data.user))
+      .catch(() => setAuthUser(null))
   }
 
   if (authLoading) return <div className="auth-loading">Loading your private workspace...</div>
-  if (!authUser) return <AuthView onAuthenticated={setAuthUser} />
 
   return <div className="app-shell">
     <div className="ambient ambient-one" /><div className="ambient ambient-two" />
@@ -137,7 +138,7 @@ function App() {
       <header className="topbar">
         <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
         <div className="topbar-heading"><span className="eyebrow">PRIVATE AI WORKMATE <b>/</b> {pageTitle(page).toUpperCase()}</span><h1>{pageTitle(page)}</h1></div>
-        <div className="topbar-actions"><div className="topbar-model"><Zap size={13} /><span>Nemotron</span><small>Nebius</small></div><StatusPill online={backendOnline} /><button className="avatar" aria-label={`Log out ${authUser.email}`} title={authUser.email} onClick={logout}>{authUser.email.slice(0, 1).toUpperCase()}</button></div>
+        <div className="topbar-actions"><div className="topbar-model"><Zap size={13} /><span>Nemotron</span><small>Nebius</small></div><StatusPill online={backendOnline} /><button className="avatar" aria-label="Reset demo workspace" title="Reset demo workspace" onClick={logout}>D</button></div>
       </header>
       {mobileNav && <MobileNav page={page} onNavigate={navigate} onClose={() => setMobileNav(false)} />}
       <div className="content-area">
@@ -179,41 +180,13 @@ function MobileNav({ page, onNavigate, onClose }: { page: Page; onNavigate: (pag
   return <div className="mobile-nav"><div className="mobile-nav-head"><b>Navigate</b><button className="icon-button" onClick={onClose} aria-label="Close navigation"><X size={18} /></button></div>{(['chat', 'memory', 'documents', 'github', 'security'] as Page[]).map((item) => <button key={item} className={page === item ? 'active' : ''} onClick={() => onNavigate(item)}>{pageTitle(item)}</button>)}</div>
 }
 
-function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      const data = await request<{ user: User }>(`/api/auth/${mode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      onAuthenticated(data.user)
-    } catch (problem) {
-      setError(problem instanceof Error ? problem.message : 'Authentication failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return <main className="auth-screen"><section className="auth-card"><div className="brand"><span className="brand-mark"><Sparkles size={16} /></span><span>PRIVATE AI<br /><strong>WORKMATE</strong></span></div><span className="eyebrow accent">PRIVATE WORKSPACE</span><h1>{mode === 'login' ? 'Welcome back.' : 'Create your workspace.'}</h1><p>Your conversations, memories, and documents stay tied to your account.</p><form onSubmit={submit}><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={8} required /></label>{error && <div className="auth-error"><CircleAlert size={15} />{error}</div>}<button className="primary-button auth-submit" disabled={busy}>{busy ? 'Working...' : mode === 'login' ? 'Log in' : 'Create account'}</button></form><button className="auth-switch" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'Create a new account' : 'I already have an account'}</button></section></main>
-}
-
 function StatusPill({ online }: { online: boolean }) { return <span className={`status-pill ${online ? '' : 'offline'}`}><span />{online ? 'CONNECTED' : 'OFFLINE'}</span> }
 
 function ChatView({ messages, busy, error, onSend, onRetry }: { messages: Message[]; busy: boolean; error: string; onSend: (text: string) => void; onRetry: () => void }) {
   const [draft, setDraft] = useState('')
   function submit(event: FormEvent) { event.preventDefault(); onSend(draft); setDraft('') }
   return <section className="chat-view">
-    {messages.length === 0 ? <div className="welcome"><div className="orb"><div className="orb-core" /><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /></div><span className="eyebrow accent">PRIVATE AI WORKSPACE</span><h2>Good evening.</h2><p>Your private AI workspace is ready.</p><div className="suggestions"><Prompt label="Analyze my GitHub repository" onClick={onSend} /><Prompt label="Search my documents" onClick={onSend} /><Prompt label="What do you remember about my projects?" onClick={onSend} /><Prompt label="Explain my backend architecture" onClick={onSend} /></div></div> : <div className="message-list">{messages.map((message, index) => <MessageBubble key={`${message.role}-${index}`} message={message} />)}{busy && <div className="thinking"><span className="pulse" /><span>Preparing a response</span><span className="thinking-dots">...</span></div>}{error && <ErrorBox message={error} onRetry={onRetry} />}</div>}
+    {messages.length === 0 ? <div className="welcome"><div className="orb"><div className="orb-core" /><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /></div><span className="eyebrow accent">PRIVATE AI WORKMATE</span><h2>Your private AI workmate.</h2><p>Remembers context, works with your documents, analyzes your code, and uses controlled tools while keeping your data under your control.</p><div className="suggestions"><Prompt label="Analyze my GitHub repository" onClick={onSend} /><Prompt label="Search my documents" onClick={onSend} /><Prompt label="What do you remember about my projects?" onClick={onSend} /><Prompt label="Explain my backend architecture" onClick={onSend} /></div></div> : <div className="message-list">{messages.map((message, index) => <MessageBubble key={`${message.role}-${index}`} message={message} />)}{busy && <div className="thinking"><span className="pulse" /><span>Preparing a response</span><span className="thinking-dots">...</span></div>}{error && <ErrorBox message={error} onRetry={onRetry} />}</div>}
     <form className="composer-wrap" onSubmit={submit}><div className="composer"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask Workmate anything..." rows={1} aria-label="Message Workmate" onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(event) } }} /><button className="send-button" disabled={busy || !draft.trim()} aria-label="Send message"><Sparkles size={17} /></button></div><div className="composer-note"><span><ShieldCheck size={13} /> Private workspace</span><span>Enter to send · Shift + Enter for new line</span></div></form>
   </section>
 }

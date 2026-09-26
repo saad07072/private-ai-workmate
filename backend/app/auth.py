@@ -146,6 +146,26 @@ def login_user(request: AuthRequest) -> tuple[dict, str]:
     return _user_response(row), _create_session(row["id"])
 
 
+def create_demo_user() -> tuple[dict, str]:
+    """Create an isolated anonymous workspace for the public demo."""
+    initialize_database()
+    user_id = str(uuid4())
+    email = f"demo-{user_id}@private-ai-workmate.local"
+    salt = secrets.token_bytes(16)
+    password = secrets.token_urlsafe(32)
+    connection = get_connection()
+    connection.execute(
+        """
+        INSERT INTO users (id, email, password_hash, password_salt)
+        VALUES (?, ?, ?, ?)
+        """,
+        (user_id, email, _hash_password(password, salt), salt.hex()),
+    )
+    connection.commit()
+    connection.close()
+    return {"id": user_id, "email": email}, _create_session(user_id)
+
+
 def set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         SESSION_COOKIE,
@@ -170,6 +190,12 @@ def auth_router():
     @router.post("/login")
     def login(request: AuthRequest, response: Response):
         user, token = login_user(request)
+        set_session_cookie(response, token)
+        return {"user": user}
+
+    @router.post("/demo")
+    def demo(response: Response):
+        user, token = create_demo_user()
         set_session_cookie(response, token)
         return {"user": user}
 

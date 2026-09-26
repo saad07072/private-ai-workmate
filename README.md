@@ -1,266 +1,189 @@
-# Private AI Workmate
+# 🔐 Private AI Workmate
 
-Private AI Workmate is a personal AI workspace powered by NVIDIA Nemotron through Nebius Token Factory. It combines persistent conversations, long-term memory, private document retrieval, controlled tools, and a read-only GitHub agent in one FastAPI application with a Vite frontend.
+> Your private AI workmate for memory, documents, tools, and developer workflows.
 
-This repository is being built for the Nebius x NVIDIA Global AI Hackathon 2026, Personal AI track.
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](backend/requirements.txt)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](backend/app/main.py)
+[![React](https://img.shields.io/badge/React-frontend-61DAFB?logo=react&logoColor=111)](frontend/src/App.tsx)
+[![NVIDIA Nemotron](https://img.shields.io/badge/NVIDIA-Nemotron-76B900)](backend/app/nemotron.py)
+[![Nebius](https://img.shields.io/badge/Nebius-Token%20Factory-111827)](https://nebius.ai/)
+[![Qdrant](https://img.shields.io/badge/Qdrant-vector%20search-DC244C)](backend/app/memory/qdrant.py)
 
-## Project Overview
+Private AI Workmate is a personal AI workspace powered by NVIDIA Nemotron through Nebius Token Factory. It combines persistent conversations, semantic memory, private document retrieval, controlled tools, and a read-only GitHub developer agent in one application.
 
-The current system can:
+## 🚀 Live Demo
 
-- Chat with NVIDIA Nemotron through the Nebius OpenAI-compatible API.
-- Persist conversations in SQLite.
-- Store and semantically retrieve long-term memories.
-- Ingest PDF, DOCX, and TXT files into a private RAG index.
-- Execute an explicitly registered set of validated tools.
-- Inspect public or token-authorized GitHub repositories without write operations.
-- Detect prompt-injection signals and preserve untrusted-data boundaries.
-- Record tool and security events in a JSONL audit file.
-- Provide a responsive frontend for chat, memory, documents, GitHub analysis, and security status.
+**Public demo:** https://private-ai-workmate.vercel.app/
 
-The application provides email/password authentication with HttpOnly session cookies and per-user ownership for conversations, memories, and documents. HTTPS configuration, encryption at rest, arbitrary shell execution, arbitrary Python execution, web browsing, and production deployment remain outside the local application.
+The demo opens directly in the Workmate interface. When no session exists, the backend creates an isolated anonymous demo workspace and protects it with the same authenticated ownership checks used by the rest of the API.
 
-## Interface Preview
+## 🧠 What is Private AI Workmate?
 
-The current frontend presents the chat workspace with its responsive shell, model status, agent context panel, and private-workspace suggestions.
+Generic AI assistants often require users to repeatedly provide context and may not provide controlled access to personal documents, memory, developer information, and tools.
 
-<p align="center">
-  <img src="docs/workmate-ui-readme.png" alt="Private AI Workmate workspace" width="100%" />
-</p>
+Private AI Workmate is designed around persistent memory, private document RAG, controlled tools, and developer workflows. Conversations and user-owned data are scoped through backend sessions; document content and memory are retrieved as context, while model-requested tools pass through validation, permissions, security scanning, and audit logging.
 
-## Current Architecture
+## 🎯 Hackathon Track
+
+**Nebius x NVIDIA Global AI Hackathon 2026**
+
+**Personal AI Track**
+
+The project fits the track through:
+
+- persistent long-term memory and semantic retrieval
+- private, user-scoped document knowledge
+- reusable backend tools with explicit permissions
+- controlled access to information and developer workflows
+- read-only GitHub repository analysis
+- bounded multi-step agent workflows
+- NVIDIA Nemotron inference through Nebius Token Factory
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TD
+    User[User] --> Frontend[Vercel React + TypeScript frontend]
+    Frontend --> Backend[Render FastAPI backend]
+    Backend --> LLM[NVIDIA Nemotron via Nebius Token Factory]
+    Backend --> DB[(SQLite persistent database)]
+    Backend --> Docs[(Local document storage)]
+    Backend --> Vectors[(Qdrant vector database)]
+    Backend --> GitHub[GitHub REST API read-only integration]
+    Docs --> RAG[PDF/DOCX/TXT extraction and chunking]
+    RAG --> Vectors
+```
+
+The repository currently uses SQLite, local document storage, and local Qdrant paths configured for the Render persistent disk. Supabase is not configured in the current implementation.
+
+## 🤖 AI / NVIDIA / Nebius
+
+NVIDIA Nemotron is the core LLM. Nebius Token Factory provides the OpenAI-compatible runtime inference API used by the backend for chat, agent synthesis, and embeddings.
+
+| Component | Current configuration | Role |
+|---|---|---|
+| Fast model | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | Configured fast/default model for everyday responses and fallback behavior |
+| Reasoning model | `nvidia/Nemotron-3-Ultra-550b-a55b` | Configured model used by the current agent path for tool collection and final synthesis |
+| Embeddings | `Qwen/Qwen3-Embedding-8B` | Embeds memory and document chunks for semantic retrieval through Nebius |
+| Runtime | Nebius Token Factory | Serves the configured NVIDIA/Qwen models through the backend |
+
+`model_router.py` contains deterministic fast/reasoning classification, but `select_model()` is not actively wired into each public request. The current agent path uses the configured reasoning model for tool collection and final synthesis, with the fast model available as a fallback.
+
+Nebius matters because it supplies the hosted inference path that lets this application use Nemotron and the embedding model without placing provider credentials in the browser.
+
+## ✨ Core Features
+
+### Persistent Memory
+
+Long-term memories can be stored, listed, and deleted through the memory API. Relevant memories are semantically retrieved before chat responses and passed as context rather than instructions.
+
+### Private Document RAG
+
+`PDF/DOCX/TXT → extraction → chunking → embeddings → Qdrant → grounded answers`
+
+Uploads are limited to 10 MB. Document metadata and chunk counts are stored in SQLite, while retrieved document chunks are filtered by similarity and scoped to the authenticated user.
+
+### Agentic Tools
+
+The registered tools include:
+
+- calculator
+- current time
+- document listing, search, and reading
+- GitHub repository inspection
+
+### GitHub Developer Agent
+
+The current GitHub integration is read-only. It supports repository information, file trees, file reading, code search, issues, pull requests, and bounded multi-step repository analysis. It does not write to repositories, create commits, merge pull requests, or run GitHub Actions.
+
+### Security
+
+Implemented controls include:
+
+- permission-gated tool execution
+- read-only GitHub access
+- prompt-injection detection
+- untrusted-data boundaries for memory, documents, and tool results
+- secret redaction in audit data
+- JSONL audit logging
+- no arbitrary shell or Python execution through model tools
+- user-scoped conversations, memory, and documents
+- HttpOnly session cookies, including isolated public demo sessions
+
+These controls describe the implemented application boundary; they are not a claim that cloud services or external content are risk-free.
+
+## 🛠️ Technology Stack
+
+| Area | Technologies |
+|---|---|
+| Frontend | React, TypeScript, Vite, Lucide React |
+| Backend | Python, FastAPI, Uvicorn |
+| AI | NVIDIA Nemotron, Nebius Token Factory, Qwen/Qwen3-Embedding-8B |
+| Storage | SQLite, local document storage, Qdrant |
+| Document processing | PyPDF, python-docx |
+| Developer integration | GitHub REST API via `httpx` |
+| Deployment | Vercel, Render persistent disk, Nebius Token Factory |
+
+## 🔐 Security & Privacy Model
 
 ```text
-User
- |
- v
-Vite + React frontend
- |
- v
-FastAPI API
- |
- +--> Conversation store (SQLite)
- +--> Long-term memory retrieval (SQLite + Qdrant)
- +--> Document RAG (extract -> chunk -> embed -> Qdrant)
- +--> Agent orchestrator
-        |
-        +--> Nemotron through Nebius Token Factory
-        +--> Tool schema validation
-        +--> Permission checks
-        +--> Prompt-injection scanning
-        +--> Approved tool execution
-        +--> Untrusted-result boundary
-        +--> JSONL audit logging
+User → React frontend → authenticated FastAPI session → controlled model/tool layer
 ```
 
-The backend is authoritative for tool permissions and execution. The model can request only tools described by the orchestrator catalog, and every request is checked again by the executor.
+Chat requests go from the browser to the backend, which retrieves user-scoped context and calls Nebius. Uploaded documents are stored by the backend, extracted and embedded, and indexed in Qdrant. Memory records are stored in SQLite and their embeddings are indexed for semantic retrieval. GitHub access is performed server-side through approved read-only operations.
 
-## NVIDIA Nemotron + Nebius
+The deployed application is cloud-hosted, so “private” means access is mediated by backend sessions, ownership filters, controlled tools, and configured cloud-service boundaries. It does not mean that all data is processed locally. Secrets such as `NEBIUS_API_KEY` and `GITHUB_TOKEN` are backend environment variables and are never part of the frontend bundle.
 
-The backend uses the OpenAI-compatible Nebius Token Factory endpoint with NVIDIA Nemotron models.
+## ☁️ Deployment
 
-Configured model defaults:
+- **Vercel:** React/Vite frontend
+- **Render:** FastAPI backend and persistent application data disk
+- **Qdrant:** vector storage using the configured Qdrant path
+- **Nebius Token Factory:** Nemotron and embedding inference
+
+Environment variable names used by deployment configuration include:
 
 ```text
-NEBIUS_FAST_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
-NEBIUS_REASONING_MODEL=nvidia/Nemotron-3-Ultra-550b-a55b
+NEBIUS_API_KEY
+GITHUB_TOKEN
+NEBIUS_FAST_MODEL
+NEBIUS_REASONING_MODEL
+WORKMATE_TOOL_MODE
+WORKMATE_COOKIE_SECURE
+WORKMATE_COOKIE_SAMESITE
+WORKMATE_DATA_DIR
+WORKMATE_DATABASE_PATH
+WORKMATE_QDRANT_PATH
+WORKMATE_DOCUMENTS_PATH
+WORKMATE_AUDIT_FILE
+CORS_ORIGINS
+VITE_API_BASE_URL
 ```
 
-`NEBIUS_API_KEY` is required for model and embedding calls. It must remain in the backend environment and must never be placed in the frontend.
+No secret values belong in this README, frontend source, or committed configuration.
 
-## Intelligent Model Routing
+## 💻 Local Development
 
-`backend/app/agents/model_router.py` contains deterministic request classification and model selection logic. It classifies requests as `fast` or `reasoning` using complexity patterns, code markers, and context length.
-
-Current integration status: the router module exists, but `run_agent()` currently uses the configured reasoning model for tool collection and final synthesis, with the fast model used as a fallback when appropriate. Per-request routing through `select_model()` is not yet wired into the public agent path. This is the remaining routing integration task, not a claim that active adaptive routing is already live.
-
-## Long-Term Memory
-
-Memories are stored in SQLite with a content string and category. The memory API supports creating, listing, and deleting memories. Chat requests retrieve relevant memories before the agent runs and add them as contextual data rather than instructions.
-
-## Semantic Memory / Qdrant
-
-Memory content is embedded with `Qwen/Qwen3-Embedding-8B` through Nebius and stored in the local Qdrant collection `workmate_memories`. Semantic retrieval returns the most relevant memories with category and similarity score metadata.
-
-Qdrant data is stored under `backend/data/qdrant/` by the current local configuration.
-
-## Private RAG
-
-The document pipeline is implemented as:
-
-```text
-PDF / DOCX / TXT
-   -> text extraction
-   -> chunking
-   -> embeddings
-   -> Qdrant collection: workmate_documents
-   -> similarity retrieval
-   -> grounded chat context
-```
-
-Uploads are limited to 10 MB and are indexed through `/api/documents/upload`. Retrieved chunks below the configured similarity threshold are ignored. Document metadata and chunk counts are stored in SQLite.
-
-## Agent Orchestration
-
-`backend/app/agents/orchestrator.py` runs a bounded multi-step loop. It can parse the model's JSON or XML-style tool requests, execute up to the configured call and iteration limits, append tool results as untrusted data, and ask Nemotron for a final synthesis.
-
-The orchestrator explicitly instructs the model that it has no direct filesystem, shell, arbitrary-code, or unrestricted internet access.
-
-## Built-in Tools
-
-The registered tools currently include:
-
-- `calculator`
-- `current_time`
-- `list_documents`
-- `search_documents`
-- `read_document`
-- `github_repo_info`
-- `github_list_files`
-- `github_read_file`
-- `github_search_code`
-- `github_list_issues`
-- `github_pull_request`
-
-Tools are registered in `backend/app/tools/registry.py`. The executor validates tool names, required and unknown arguments, declared types, and tool-specific constraints before calling an implementation.
-
-## GitHub Read-only Agent
-
-The GitHub integration uses the GitHub REST API through `httpx`. It can read repository metadata, list repository files, read files, search code, inspect issues, and inspect pull requests.
-
-GitHub operations do not push code, create commits, delete files, modify repository settings, merge or approve pull requests, or execute GitHub Actions. `GITHUB_TOKEN` is optional for requests that can use unauthenticated GitHub access, but it may be needed for private repositories or higher API limits.
-
-The frontend's GitHub page submits analysis requests through the existing chat endpoint because the backend does not expose a separate GitHub router.
-
-## Permission System
-
-The permission layer is implemented in `backend/app/tools/permissions.py`.
-
-- `WORKMATE_TOOL_MODE` defaults to `read_only`.
-- Only tools present in the explicit policy table are allowed.
-- Unknown tools are denied.
-- Repository names must use `owner/name` format.
-- Repository paths reject absolute paths, null bytes, and `..` traversal segments.
-- Tool-specific limits validate IDs, queries, refs, and result counts.
-
-Authentication is provided through `/api/auth/register`, `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout`. Sessions are stored in SQLite and the browser receives only an HttpOnly session cookie. Conversations, memories, and documents are scoped to the authenticated user.
-
-## Prompt-injection Protection
-
-`backend/app/tools/security.py` normalizes Unicode text, removes zero-width and bidirectional control characters, and scans for patterns such as instruction overrides, system-prompt extraction, role overrides, tool-permission bypass attempts, and secret extraction.
-
-Suspicious input produces a security event; it does not bypass the deterministic permission checks.
-
-## Untrusted-data Boundaries
-
-Memory context, uploaded document content, and tool results are wrapped or labeled as untrusted data before being presented to the model. The orchestrator instructs Nemotron to use these values as evidence only and never as instructions or permission changes.
-
-Tool output is scanned for instruction-like content and the executor reports whether suspicious content was detected. This boundary is a defensive control, not a guarantee that external data is safe.
-
-## Audit Logging
-
-Tool calls and security events are written to `backend/data/tool_audit.jsonl`.
-
-Audit records include timestamps, tool names, redacted arguments, success state, event categories, and summarized results. Private result fields such as document text, code, diffs, and bodies are omitted or marked as private content. Long values and secret-like keys are redacted or truncated.
-
-The current API does not expose a live audit-event stream or an audit-history endpoint.
-
-## Frontend
-
-The frontend is implemented in `frontend/` with React, TypeScript, Vite, and Lucide React. It provides:
-
-- Chat with conversation IDs and backend error states.
-- Memory listing and refresh.
-- PDF, DOCX, and TXT upload with indexed-document listing.
-- GitHub repository analysis through chat-backed agent requests.
-- Security status based on the implemented read-only tool model.
-- Responsive desktop, tablet, and mobile layouts.
-
-During local development, Vite proxies `/api` and `/health` to `http://127.0.0.1:8000`. No backend CORS change is required for this setup.
-
-## API Endpoints
-
-### System
-
-```http
-GET /
-GET /health
-```
-
-### Chat
-
-```http
-POST /api/chat
-GET /api/conversations/{conversation_id}
-```
-
-### Authentication
-
-```http
-POST /api/auth/register
-POST /api/auth/login
-GET /api/auth/me
-POST /api/auth/logout
-```
-
-Chat request:
-
-```json
-{
-  "message": "Analyze the architecture of my project",
-  "conversation_id": "optional-existing-id"
-}
-```
-
-### Memory
-
-```http
-POST /api/memory
-GET /api/memory
-DELETE /api/memory/{memory_id}
-```
-
-### Documents
-
-```http
-POST /api/documents/upload
-GET /api/documents
-DELETE /api/documents/{document_id}
-```
-
-The upload endpoint expects a multipart form field named `file`. Supported extensions are `.pdf`, `.docx`, and `.txt`.
-
-FastAPI also provides interactive documentation at `/docs` when the backend is running.
-
-## Local Setup
-
-### Backend
+Clone the repository and install the backend dependencies:
 
 ```powershell
+git clone https://github.com/saad07072/private-ai-workmate.git
+cd private-ai-workmate
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r backend/requirements.txt
 ```
 
-Create `backend/.env` from `backend/.env.example` and configure these backend environment values:
+Create `backend/.env` from `backend/.env.example` and set `NEBIUS_API_KEY`. `GITHUB_TOKEN` is optional for public repository access. Keep `WORKMATE_TOOL_MODE=read_only` during development.
 
-```env
-NEBIUS_API_KEY=your_nebius_api_key
-GITHUB_TOKEN=optional_github_token
-NEBIUS_FAST_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
-NEBIUS_REASONING_MODEL=nvidia/Nemotron-3-Ultra-550b-a55b
-WORKMATE_TOOL_MODE=read_only
-WORKMATE_COOKIE_SECURE=false
-```
-
-Start FastAPI:
+Start the backend:
 
 ```powershell
 cd backend
 python -m uvicorn app.main:app --reload
 ```
 
-### Frontend
+In a second terminal, start the frontend:
 
 ```powershell
 cd frontend
@@ -268,80 +191,68 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173/`. The frontend does not contain backend credentials or API keys.
+Open `http://127.0.0.1:5173/`. Vite proxies `/api` and `/health` to `http://127.0.0.1:8000`.
 
-## Current Project Status
+Docker Compose is also supported when Docker is installed and `backend/.env` is configured:
 
-### Implemented
-
-- FastAPI backend and local SQLite persistence.
-- NVIDIA Nemotron and Nebius Token Factory integration.
-- Bounded agent orchestration with approved tool requests.
-- Long-term memory and Qdrant semantic retrieval.
-- PDF, DOCX, and TXT private RAG ingestion.
-- Read-only GitHub repository tools.
-- Explicit tool registry, schema validation, and read-only permission policy.
-- Prompt-injection scanning and untrusted-data boundaries.
-- Redacted JSONL tool and security audit logging.
-- React/Vite frontend for chat, memory, documents, GitHub analysis, and security status.
-- Tests covering core permission and prompt-injection behavior.
-
-### Configurable or environment-dependent
-
-- Fast and reasoning model names can be changed with environment variables.
-- GitHub access can use an optional token, subject to GitHub permissions and rate limits.
-- Tool mode is configured through `WORKMATE_TOOL_MODE`; the current policy allows only read-only operation.
-- Nebius model and embedding features require valid backend credentials and network access.
-
-### Planned or not currently exposed
-
-- Wiring `model_router.select_model()` into the public agent path for active per-request routing.
-- User approval workflows.
-- A frontend audit-history or live tool-event endpoint.
-- Production deployment, monitoring, and operational hardening.
-- Automated evaluation and benchmarking.
-
-## Hackathon Demo Flow
-
-1. Start the backend and frontend.
-2. Open the Workmate chat and ask it to analyze `saad07072/private-ai-workmate`.
-3. Let the agent use the read-only GitHub tools to retrieve repository metadata, structure, and relevant files.
-4. Review the synthesized architecture response in the chat or GitHub Agent view.
-5. Add a memory through `POST /api/memory`, then ask a related question to demonstrate semantic retrieval.
-6. Upload a PDF, DOCX, or TXT document and confirm its indexed metadata in Documents.
-7. Ask a question grounded in that document.
-8. Open Security Center to review read-only permissions, prompt-injection scanning, untrusted-data boundaries, and audit logging.
-
-## Project Structure
-
-```text
-private-ai-workmate/
-|-- backend/
-|   |-- app/
-|   |   |-- agents/
-|   |   |-- api/
-|   |   |-- github/
-|   |   |-- memory/
-|   |   |-- rag/
-|   |   |-- tools/
-|   |   |-- main.py
-|   |   |-- nemotron.py
-|   |-- .env.example
-|   |-- requirements.txt
-|-- frontend/
-|-- tests/
-|-- docs/
-|-- README.md
+```powershell
+docker compose up --build
 ```
 
-## Hackathon
+## 🧪 Validation
 
-Built for the **Nebius x NVIDIA Global AI Hackathon 2026**, Personal AI track.
+The repository supports these checks and validation surfaces:
 
-Core technologies include NVIDIA Nemotron, Nebius Token Factory, Qdrant, FastAPI, Python, React, Vite, SQLite, and the GitHub REST API.
+- backend `GET /health` health check
+- frontend TypeScript check and production build via `npm run build`
+- security tests in `tests/test_security.py`
+- semantic memory retrieval script in `backend/app/memory/test_semantic.py`
+- Nebius connectivity check in `backend/app/check_nebius.py`
+- document/RAG retrieval through the Documents and Chat APIs
+- GitHub agent read-only tools through the chat-backed agent path
+- prompt-injection and permission checks in the backend security layer
+- Docker healthcheck and Compose validation through `docker compose up --build`
 
-## Author
+## 📊 Hackathon Requirements Checklist
 
-**Saad Mujawar**
+Based on the current [official hackathon requirements](https://nebiusglobalaihackathon.devpost.com/):
 
-GitHub: https://github.com/saad07072
+- [x] Working software application
+- [x] Runs using Nebius Token Factory
+- [x] Uses an NVIDIA open-source model / Nemotron
+- [x] Personal AI track
+- [x] Public working demo
+- [x] Public source repository: https://github.com/saad07072/private-ai-workmate
+- [x] README with setup instructions
+- [x] README explains NVIDIA/Nemotron and Nebius usage
+- [ ] Public demonstration video under 3 minutes
+- [ ] Final Devpost submission
+- [ ] Feedback on Nebius/NVIDIA technologies
+- [ ] Open-source license visible in the public repository
+
+The official submission requires a working project, a working demo URL, a public code repository with setup guidance, and a public video of three minutes or less. Review the [official rules](https://nebiusglobalaihackathon.devpost.com/rules) before submitting.
+
+## 🏆 Why This Project Fits Personal AI
+
+Private AI Workmate brings together persistent personal context, private document knowledge, controlled tools, developer workflows, and cloud-hosted Nemotron inference. Its focus is a personal workspace that can remember useful context, work over a user’s documents, inspect code through approved read-only operations, and keep the model inside a deliberately bounded backend tool layer.
+
+## 🎥 Demo Flow
+
+1. Open the live application.
+2. Show the main Private AI Workmate interface.
+3. Ask a normal question.
+4. Demonstrate persistent memory.
+5. Ask a question about an uploaded document.
+6. Demonstrate GitHub repository analysis.
+7. Show Security Center and the tool boundary.
+8. Briefly show the architecture and Nebius/Nemotron integration.
+
+## 📸 Product UI
+
+![Private AI Workmate UI](docs/workmate-ui.png)
+
+## 📚 Hackathon References
+
+- [Nebius x NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com/)
+- [Official rules](https://nebiusglobalaihackathon.devpost.com/rules)
+- [Public repository](https://github.com/saad07072/private-ai-workmate)
