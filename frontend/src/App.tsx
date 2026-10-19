@@ -499,8 +499,231 @@ function MessageBubble({ message }: { message: Message }) {
   )
 }
 
+function parseInline(text: string): ReactNode {
+  const parts: ReactNode[] = []
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    const token = match[0]
+    const key = `${match.index}-${token.slice(0, 5)}`
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(<strong key={key} style={{ color: '#edf2f9', fontWeight: 700 }}>{token.slice(2, -2)}</strong>)
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(
+        <code
+          key={key}
+          style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: '0.9em',
+            background: 'rgba(104,216,236,0.1)',
+            color: 'var(--cyan)',
+            padding: '2px 5px',
+            borderRadius: 4,
+          }}
+        >
+          {token.slice(1, -1)}
+        </code>
+      )
+    } else if (token.startsWith('*') && token.endsWith('*')) {
+      parts.push(<em key={key}>{token.slice(1, -1)}</em>)
+    }
+    lastIndex = regex.lastIndex
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return parts.length > 0 ? parts : text
+}
+
 function MarkdownText({ text }: { text: string }) {
-  return <div className="markdown">{text.split('\n').map((line, index) => <p key={index} className={line.startsWith('```') ? 'code-line' : ''}>{line || '\u00a0'}</p>)}</div>
+  const lines = text.split('\n')
+  const elements: ReactNode[] = []
+  let inCodeBlock = false
+  let codeBlockLines: string[] = []
+  let listItems: ReactNode[] = []
+  let listType: 'ul' | 'ol' | null = null
+
+  function flushList() {
+    if (listItems.length > 0) {
+      const key = `list-${elements.length}`
+      if (listType === 'ol') {
+        elements.push(
+          <ol key={key} style={{ margin: '6px 0', paddingLeft: 22, display: 'grid', gap: 4 }}>
+            {listItems}
+          </ol>
+        )
+      } else {
+        elements.push(
+          <ul key={key} style={{ margin: '6px 0', paddingLeft: 20, display: 'grid', gap: 4 }}>
+            {listItems}
+          </ul>
+        )
+      }
+      listItems = []
+      listType = null
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i]
+    const trimmed = rawLine.trim()
+
+    // 1. Code Block boundary
+    if (trimmed.startsWith('```')) {
+      flushList()
+      if (inCodeBlock) {
+        elements.push(
+          <pre
+            key={`code-${i}`}
+            style={{
+              margin: '8px 0',
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: '#090d14',
+              border: '1px solid var(--line)',
+              overflowX: 'auto',
+              fontFamily: "'DM Mono', monospace",
+              fontSize: '11px',
+              color: '#8bdbd4',
+              lineHeight: 1.55,
+            }}
+          >
+            <code>{codeBlockLines.join('\n')}</code>
+          </pre>
+        )
+        codeBlockLines = []
+        inCodeBlock = false
+      } else {
+        inCodeBlock = true
+        codeBlockLines = []
+      }
+      continue
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(rawLine)
+      continue
+    }
+
+    // 2. Horizontal rule: ---, ***, or --
+    if (/^(\-{2,}|\*{3,})$/.test(trimmed)) {
+      flushList()
+      elements.push(
+        <hr
+          key={`hr-${i}`}
+          style={{
+            border: 0,
+            height: 1,
+            background: 'var(--line)',
+            margin: '12px 0',
+          }}
+        />
+      )
+      continue
+    }
+
+    // 3. Headings: #, ##, ###, ####
+    if (trimmed.startsWith('#')) {
+      flushList()
+      const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/)
+      if (headingMatch) {
+        const level = headingMatch[1].length
+        const content = parseInline(headingMatch[2])
+        if (level === 1) {
+          elements.push(
+            <h2 key={`h1-${i}`} style={{ fontSize: 16, fontWeight: 700, margin: '14px 0 6px', color: '#f3f7fc', letterSpacing: '-0.02em' }}>
+              {content}
+            </h2>
+          )
+        } else if (level === 2) {
+          elements.push(
+            <h3 key={`h2-${i}`} style={{ fontSize: 14, fontWeight: 700, margin: '12px 0 5px', color: '#e5edf7', letterSpacing: '-0.01em' }}>
+              {content}
+            </h3>
+          )
+        } else {
+          elements.push(
+            <h4 key={`h3-${i}`} style={{ fontSize: 12, fontWeight: 700, margin: '10px 0 4px', color: 'var(--cyan)' }}>
+              {content}
+            </h4>
+          )
+        }
+        continue
+      }
+    }
+
+    // 4. Bullet list items: - item, * item
+    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/)
+    if (bulletMatch) {
+      if (listType !== 'ul') {
+        flushList()
+        listType = 'ul'
+      }
+      listItems.push(
+        <li key={`li-${i}`} style={{ lineHeight: 1.6, color: '#c3ccda' }}>
+          {parseInline(bulletMatch[1])}
+        </li>
+      )
+      continue
+    }
+
+    // 5. Ordered list items: 1. item
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
+    if (orderedMatch) {
+      if (listType !== 'ol') {
+        flushList()
+        listType = 'ol'
+      }
+      listItems.push(
+        <li key={`li-${i}`} style={{ lineHeight: 1.6, color: '#c3ccda' }}>
+          {parseInline(orderedMatch[2])}
+        </li>
+      )
+      continue
+    }
+
+    // Normal line or paragraph
+    flushList()
+    if (!trimmed) {
+      elements.push(<div key={`empty-${i}`} style={{ height: 6 }} />)
+    } else {
+      elements.push(
+        <p key={`p-${i}`} style={{ margin: 0, minHeight: '1em', lineHeight: 1.7, color: '#c3ccda' }}>
+          {parseInline(trimmed)}
+        </p>
+      )
+    }
+  }
+
+  flushList()
+  if (inCodeBlock && codeBlockLines.length > 0) {
+    elements.push(
+      <pre
+        key="code-eof"
+        style={{
+          margin: '8px 0',
+          padding: '10px 14px',
+          borderRadius: 8,
+          background: '#090d14',
+          border: '1px solid var(--line)',
+          overflowX: 'auto',
+          fontFamily: "'DM Mono', monospace",
+          fontSize: '11px',
+          color: '#8bdbd4',
+          lineHeight: 1.55,
+        }}
+      >
+        <code>{codeBlockLines.join('\n')}</code>
+      </pre>
+    )
+  }
+
+  return <div className="markdown">{elements}</div>
 }
 
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
